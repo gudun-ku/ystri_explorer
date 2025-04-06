@@ -1,0 +1,36 @@
+{
+    "name": "yandex-s3-explorer",
+    "publisher": "your-name",
+    "version": "1.0.0",
+    "engines": {"vscode": "^1.75.0"},
+    "main": "./dist/extension.js",
+    "activationEvents": ["onCommand:yandex-s3-explorer.download", "onCommand:yandex-s3-explorer.upload"],
+    "contributes": {
+      "commands": [
+        {"command": "yandex-s3-explorer.download", "title": "Download from Yandex S3"},
+        {"command": "yandex-s3-explorer.upload", "title": "Upload to Yandex S3"}
+      ],
+      "configuration": {
+        "title": "Yandex S3 Settings",
+        "properties": {
+          "yandexS3.accessKeyId": {"type": "string", "description": "Access Key ID"},
+          "yandexS3.secretAccessKey": {"type": "string", "description": "Secret Access Key"},
+          "yandexS3.bucketName": {"type": "string", "description": "Bucket Name"}
+        }
+      }
+    },
+    "scripts": {
+      "compile": "tsc -p ./",
+      "watch": "tsc -watch -p ./"
+    },
+    "dependencies": {
+      "@aws-sdk/client-s3": "^3.540.0",
+      "@aws-sdk/lib-storage": "^3.540.0",
+      "@aws-sdk/s3-request-presigner": "^3.540.0"
+    },
+    "devDependencies": {
+      "@types/node": "^18.0.0",
+      "@types/vscode": "^1.75.0",
+      "typescript": "^5.0.0"
+    }
+  }

@@ -1,0 +1,5 @@
+{
+    "yandexS3.accessKeyId": "YOUR_ACCESS_KEY",
+    "yandexS3.secretAccessKey": "YOUR_SECRET_KEY",
+    "yandexS3.bucketName": "YOUR_BUCKET_NAME"
+  }
