@@ -5,6 +5,7 @@ import * as vscode from "vscode";
 import * as fs from "fs";
 import * as stream from "stream";
 import { promisify } from "util";
+import * as path from "path"; // <-- Добавьте эту строку
 
 const pipeline = promisify(stream.pipeline);
 
@@ -35,19 +36,47 @@ export class YandexS3Client {
     }
 
     async listObjects(prefix: string = "") {
-        try {
-            const command = new ListObjectsV2Command({
-                Bucket: this.bucketName,
-                Prefix: prefix
-            });
-            
-            const response = await this.client.send(command);
-            return response.Contents || [];
-        } catch (error) {
-            vscode.window.showErrorMessage(`S3 List Objects error: ${error}`);
-            return [];
-        }
-    }
+      try {
+          const command = new ListObjectsV2Command({
+              Bucket: this.bucketName,
+              Prefix: prefix,
+              Delimiter: "/"
+          });
+          
+          const response = await this.client.send(command);
+          return response.Contents || [];
+      } catch (error) {
+          vscode.window.showErrorMessage(`S3 List Objects error: ${error}`);
+          return [];
+      }
+  }
+  
+  async uploadFile(localPath: string, key: string) {
+      try {
+          const fileStream = fs.createReadStream(localPath);
+          
+          const upload = new Upload({
+              client: this.client,
+              params: {
+                  Bucket: this.bucketName,
+                  Key: key,
+                  Body: fileStream
+              }
+          });
+  
+          upload.on("httpUploadProgress", (progress) => {
+              if (progress.loaded && progress.total) {
+                  const percent = Math.round((progress.loaded / progress.total) * 100);
+                  vscode.window.setStatusBarMessage(`Uploading ${path.basename(key)}: ${percent}%`, 3000);
+              }
+          });
+  
+          await upload.done();
+      } catch (error) {
+          vscode.window.showErrorMessage(`Upload failed: ${error}`);
+          throw error;
+      }
+  }
 
     async downloadFile(key: string, localPath: string) {
         try {
@@ -66,26 +95,6 @@ export class YandexS3Client {
             }
         } catch (error) {
             vscode.window.showErrorMessage(`Download failed: ${error}`);
-            throw error;
-        }
-    }
-
-    async uploadFile(localPath: string, key: string) {
-        try {
-            const fileStream = fs.createReadStream(localPath);
-            
-            const upload = new Upload({
-                client: this.client,
-                params: {
-                    Bucket: this.bucketName,
-                    Key: key,
-                    Body: fileStream
-                }
-            });
-
-            await upload.done();
-        } catch (error) {
-            vscode.window.showErrorMessage(`Upload failed: ${error}`);
             throw error;
         }
     }

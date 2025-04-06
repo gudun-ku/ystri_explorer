@@ -8,67 +8,70 @@ export function activate(context: vscode.ExtensionContext) {
 
     context.subscriptions.push(
         vscode.commands.registerCommand("yandex-s3-explorer.download", async () => {
-            const folderUri = await vscode.window.showOpenDialog({
-                canSelectFolders: true,
-                canSelectFiles: false,
-                openLabel: "Select Download Folder"
-            });
-
-            if (folderUri && folderUri[0]) {
-                try {
-                    await downloadDirectory(s3Client, folderUri[0].fsPath);
-                    vscode.window.showInformationMessage("Download completed successfully");
-                } catch (error) {
-                    vscode.window.showErrorMessage(`Download failed: ${error}`);
-                }
+            try {
+                const projectInfo = getCurrentProjectInfo();
+                await downloadProject(s3Client, projectInfo);
+                vscode.window.showInformationMessage(`Downloaded project '${projectInfo.name}' successfully`);
+            } catch (error) {
+                vscode.window.showErrorMessage(`Download failed: ${error}`);
             }
         })
     );
 
     context.subscriptions.push(
         vscode.commands.registerCommand("yandex-s3-explorer.upload", async () => {
-            const folderUri = await vscode.window.showOpenDialog({
-                canSelectFolders: true,
-                canSelectFiles: false,
-                openLabel: "Select Folder to Upload"
-            });
-
-            if (folderUri && folderUri[0]) {
-                try {
-                    await uploadDirectory(s3Client, folderUri[0].fsPath);
-                    vscode.window.showInformationMessage("Upload completed successfully");
-                } catch (error) {
-                    vscode.window.showErrorMessage(`Upload failed: ${error}`);
-                }
+            try {
+                const projectInfo = getCurrentProjectInfo();
+                await uploadProject(s3Client, projectInfo);
+                vscode.window.showInformationMessage(`Uploaded project '${projectInfo.name}' successfully`);
+            } catch (error) {
+                vscode.window.showErrorMessage(`Upload failed: ${error}`);
             }
         })
     );
 }
 
-async function downloadDirectory(client: YandexS3Client, localPath: string) {
-    const objects = await client.listObjects();
+function getCurrentProjectInfo() {
+    const workspaceFolders = vscode.workspace.workspaceFolders;
+    if (!workspaceFolders || workspaceFolders.length === 0) {
+        throw new Error("No project folder open in VS Code");
+    }
+    
+    const rootUri = workspaceFolders[0].uri;
+    return {
+        name: path.basename(rootUri.fsPath),
+        localPath: rootUri.fsPath
+    };
+}
+
+async function downloadProject(client: YandexS3Client, projectInfo: {name: string, localPath: string}) {
+    const objects = await client.listObjects(projectInfo.name + "/");
     
     for (const object of objects) {
         if (!object.Key) continue;
         
-        const filePath = path.join(localPath, object.Key);
-        const dirName = path.dirname(filePath);
+        // Удаляем имя проекта из пути
+        const relativePath = object.Key.replace(`${projectInfo.name}/`, '');
+        const localFilePath = path.join(projectInfo.localPath, relativePath);
+        const dirName = path.dirname(localFilePath);
         
         if (!fs.existsSync(dirName)) {
             fs.mkdirSync(dirName, { recursive: true });
         }
         
-        await client.downloadFile(object.Key, filePath);
-        vscode.window.setStatusBarMessage(`Downloaded: ${object.Key}`, 3000);
+        await client.downloadFile(object.Key, localFilePath);
+        vscode.window.setStatusBarMessage(`Downloaded: ${relativePath}`, 3000);
     }
 }
 
-async function uploadDirectory(client: YandexS3Client, localPath: string) {
-    const files = getAllFiles(localPath);
+async function uploadProject(client: YandexS3Client, projectInfo: {name: string, localPath: string}) {
+    const files = getAllFiles(projectInfo.localPath);
     
     for (const file of files) {
-        const relativePath = path.relative(localPath, file);
-        await client.uploadFile(file, relativePath);
+        const relativePath = path.relative(projectInfo.localPath, file);
+        const s3Key = `${projectInfo.name}/${relativePath.replace(/\\/g, '/')}`; // Для Windows путей
+        
+        await client.uploadFile(file, s3Key);
         vscode.window.setStatusBarMessage(`Uploaded: ${relativePath}`, 3000);
     }
 }
